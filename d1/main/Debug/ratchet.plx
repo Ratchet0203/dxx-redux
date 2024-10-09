@@ -69,7 +69,7 @@ retsize=0
 [end]
 [toggles]
 persistentdebris=0
-prshot=1
+prshot=0
 demorecordingindicator=0
 noredundancy=0
 multimessages=0
@@ -90,13 +90,14 @@ missilecolor=8
 overrideteamcolors=0
 myteamcolor=8
 otherteamcolor=8
-maxfps=144
+maxfps=200
 nochatsound=0
+rankshowplusminus=1
 [end]
 [observer]
 obssharesettings=1
 obsturbo=0
-obsshowcockpit=0
+obsshowcockpit=1
 obsshowscoreboardshieldtext=1
 obsshowscoreboardshieldbar=1
 obsshowammobars=1
@@ -107,10 +108,10 @@ obsshowdamage=1
 obsshowshieldtext=0
 obsshowshieldbar=1
 obsshowkillfeed=1
-obsshowdeathsummary=1
-obsshowstreaks=1
-obsshowkillgraph=1
-obsshowbreakdown=1
+obsshowdeathsummary=0
+obsshowstreaks=0
+obsshowkillgraph=0
+obsshowbreakdown=0
 obsshowobs=1
 obschat=1
 obsplayerchat=1
@@ -118,7 +119,7 @@ obsshowbombtimes=0
 [end]
 [graphics]
 alphaeffects=1
-dynlightcolor=1
+dynlightcolor=0
 [end]
 [plx version]
 plx version=1.0.0

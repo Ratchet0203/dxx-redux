@@ -215,6 +215,32 @@ try_again:
 
 void delete_player_saved_games(char* name);
 
+int ranks_menu_keycommand(listbox* lb, d_event* event)
+{
+	char** items = listbox_get_items(lb);
+	int citem = listbox_get_citem(lb);
+	int delete;
+	char filename[256];
+
+	switch (event_key_get(event))
+	{
+	case KEY_CTRLED + KEY_D:
+		delete = nm_messagebox(NULL, 2, TXT_YES, TXT_NO, "Delete record for this level?");
+		if (delete == 0)
+		{
+			sprintf(filename, "ranks/%s/%s/level%d.hi", Players[Player_num].callsign, Current_mission->filename, citem + 1);
+			if (citem >= Current_mission->last_level)
+				sprintf(filename, "ranks/%s/%s/levelS%d.hi", Players[Player_num].callsign, Current_mission->filename, citem + 1);
+			if (PHYSFS_exists(filename)) {
+				PHYSFS_delete(filename);
+				nm_messagebox(NULL, 1, "Ok", "Record deleted.\nRefresh level list to update.");
+			}
+		}
+	}
+
+	return 0;
+}
+
 int player_menu_keycommand(listbox* lb, d_event* event)
 {
 	char** items = listbox_get_items(lb);
@@ -561,6 +587,9 @@ int ranks_menu_handler(listbox* lb, d_event* event, void* userdata)
 
 	switch (event->type)
 	{
+	case EVENT_KEY_COMMAND:
+		return ranks_menu_keycommand(lb, event);
+		break;
 	case EVENT_NEWMENU_SELECTED:
 		Players[Player_num].lives = 3;
 		Difficulty_level = PlayerCfg.DefaultDifficulty;
@@ -602,26 +631,10 @@ void do_best_ranks_menu()
 	int numlines = Current_mission->last_level - Current_mission->last_secret_level;
 	char** list = (char**)malloc(sizeof(char*) * numlines);
 	char message[256];
-	sprintf(message, "%s's %s records", Players[Player_num].callsign, Current_mission->mission_name);
+	sprintf(message, "%s's %s records\n<Ctrl-D> deletes", Players[Player_num].callsign, Current_mission->mission_name);
 	char filename[256];
 	char** items = (char**)malloc(sizeof(char*) * numlines);
 	int* ranks = (int*)malloc(sizeof(int) * numlines);
-	char** Rank = (char**)malloc(sizeof(char*) * 15);
-	Rank[0] = "N/A";
-	Rank[1] = "E";
-	Rank[2] = "D-";
-	Rank[3] = "D";
-	Rank[4] = "D+";
-	Rank[5] = "C-";
-	Rank[6] = "C";
-	Rank[7] = "C+";
-	Rank[8] = "B-";
-	Rank[9] = "B";
-	Rank[10] = "B+";
-	Rank[11] = "A-";
-	Rank[12] = "A";
-	Rank[13] = "A+";
-	Rank[14] = "S";
 	int i;
 	if (Current_mission->anarchy_only_flag == 1) {
 		list[i] = (char*)malloc(sizeof(char) * 64);
@@ -637,9 +650,9 @@ void do_best_ranks_menu()
 			list[i] = (char*)malloc(sizeof(char) * 64);
 			if (fp == NULL) {
 				if (i < Current_mission->last_level)
-					snprintf(list[i], 64, "%i. ???:\tN/A   ", i + 1);
+					snprintf(list[i], 64, "%i. ???\tN/A    ", i + 1);
 				else
-					snprintf(list[i], 64, "S%i. ???:\tN/A   ", i - Current_mission->last_level + 1);
+					snprintf(list[i], 64, "S%i. ???\tN/A    ", i - Current_mission->last_level + 1);
 				ranks[i] = 0;
 			}
 			else {
@@ -651,15 +664,15 @@ void do_best_ranks_menu()
 				snprintf(level_name, LEVEL_NAME_LEN, buffer);
 				if (Ranking.rank > 0) {
 					if (i < Current_mission->last_level)
-						snprintf(list[i], 64, "%i. %s:\t%.0f   ", i + 1, level_name, Ranking.calculatedScore);
+						snprintf(list[i], 64, "%i. %s\t%.0f    ", i + 1, level_name, Ranking.calculatedScore);
 					else
-						snprintf(list[i], 64, "S%i. %s:\t%.0f   ", i - Current_mission->last_level + 1, level_name, Ranking.calculatedScore);
+						snprintf(list[i], 64, "S%i. %s\t%.0f    ", i - Current_mission->last_level + 1, level_name, Ranking.calculatedScore);
 				}
 				else {
 					if (i < Current_mission->last_level)
-						snprintf(list[i], 64, "%i. %s:\tN/A   ", i + 1, level_name);
+						snprintf(list[i], 64, "%i. %s\tN/A    ", i + 1, level_name);
 					else
-						snprintf(list[i], 64, "S%i. %s:\tN/A   ", i - Current_mission->last_level + 1, level_name);
+						snprintf(list[i], 64, "S%i. %s\tN/A    ", i - Current_mission->last_level + 1, level_name);
 				}
 			}
 			PHYSFS_close(fp);
@@ -681,6 +694,7 @@ int do_option(int select)
 {
 	switch (select) {
 	case MENU_NEW_GAME:
+		Ranking.fromBestRanksButton = 0;
 		select_mission(0, "New Game\n\nSelect mission", do_new_game_menu);
 		break;
 	case MENU_GAME:
@@ -707,6 +721,7 @@ int do_option(int select)
 		scores_view(NULL, -1);
 		break;
 	case MENU_VIEW_RANKS:
+		Ranking.fromBestRanksButton = 1;
 		select_mission(0, "Select mission", do_best_ranks_menu);
 		break;
 #if 1 //def SHAREWARE
@@ -727,6 +742,7 @@ int do_option(int select)
 #ifdef USE_UDP
 	case MENU_START_UDP_NETGAME:
 		multi_protocol = MULTI_PROTO_UDP;
+		Ranking.fromBestRanksButton = 0;
 		select_mission(1, TXT_MULTI_MISSION, net_udp_setup_game);
 		break;
 	case MENU_JOIN_MANUAL_UDP_NETGAME:
@@ -2161,11 +2177,12 @@ struct misc_menu_data {
 
 void do_misc_menu()
 {
-	newmenu_item m[31];
+	newmenu_item m[32];
 	int i = 0;
 	struct misc_menu_data misc_menu_data;
 
 	do {
+		ADD_CHECK(31, "Show +/- on rank letters", PlayerCfg.RankShowPlusMinus);
 		ADD_CHECK(0, "Ship auto-leveling", PlayerCfg.AutoLeveling);
 		ADD_CHECK(1, "Persistent Debris", PlayerCfg.PersistentDebris);
 		ADD_CHECK(2, "Screenshots w/o HUD", PlayerCfg.PRShot);
@@ -2292,6 +2309,7 @@ void do_misc_menu()
 		PlayerCfg.NoChatSound = m[20].value;
 		PlayerCfg.ShowCustomColors = m[25].value;
 		PlayerCfg.PreferMyTeamColors = (PlayerCfg.MyTeamColor == 8 && PlayerCfg.OtherTeamColor == 8) ? 0 : m[30].value;
+		PlayerCfg.RankShowPlusMinus = m[31].value;
 
 	} while (i > -1);
 

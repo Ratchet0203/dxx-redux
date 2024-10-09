@@ -36,6 +36,10 @@ COPYRIGHT 1993-1998 PARALLAX SOFTWARE CORPORATION.  ALL RIGHTS RESERVED.
 #include "text.h"
 #include "u_mem.h"
 #include "ignorecase.h"
+#include "gamefont.h"
+#include "ogl_init.h"
+#include "newmenu.h"
+#include "playsave.h"
 
  //values that describe where a mission is located
 enum mle_loc
@@ -389,11 +393,15 @@ void add_missions_to_list(mle* mission_list, char* path, char* rel_path, int ana
 				{
 					mission_list[num_missions].builtin_hogsize = 0;
 					num_missions++;
+					if (Ranking.fromBestRanksButton) {
+						sprintf(Ranking.missionNames[num_missions - 1], rel_path); // Get rid of the mission file's extension so we can load it by name.
+						(strrchr(Ranking.missionNames[num_missions - 1], '.'))[0] = 0;
+					}
 				}
 				else
 					d_free(mission_list[num_missions].path);
 			}
-
+		
 		if (num_missions >= MAX_MISSIONS)
 		{
 			break;
@@ -751,10 +759,29 @@ typedef struct mission_menu
 	int (*when_selected)(void);
 } mission_menu;
 
+struct listbox
+{
+	window * wind;
+	char* title;
+	int nitems;
+	char** item;
+	int allow_abort_flag;
+	int (*listbox_callback)(listbox* lb, d_event* event, void* userdata);
+	int citem, first_item;
+	int marquee_maxchars, marquee_charpos, marquee_scrollback;
+	fix64 marquee_lasttime; // to scroll text if string does not fit in box
+	int box_w, height, box_x, box_y, title_height;
+	short swidth, sheight; float fntscalex, fntscaley; // with these we check if
+	int mouse_state;
+	void* userdata;
+};
+#define LB_ITEMS_ON_SCREEN 8
+
 int mission_menu_handler(listbox* lb, d_event* event, mission_menu* mm)
 {
 	char** list = listbox_get_items(lb);
 	int citem = listbox_get_citem(lb);
+	int rval;
 
 	switch (event->type)
 	{
@@ -771,13 +798,31 @@ int mission_menu_handler(listbox* lb, d_event* event, mission_menu* mm)
 		}
 		return !(*mm->when_selected)();
 		break;
-
+		
 	case EVENT_WINDOW_CLOSE:
 		free_mission_list(mm->mission_list);
 		d_free(list);
 		d_free(mm);
 		break;
 
+	case EVENT_WINDOW_DRAW:
+		if (Ranking.fromBestRanksButton) {
+			rval = listbox_draw(lb->wind, lb);
+
+			for (int i = lb->first_item; i < lb->first_item + LB_ITEMS_ON_SCREEN && i < lb->nitems; i++) {
+				int rank = Ranking.missionRanks[i];
+				if (rank == 0)
+					continue;
+				grs_bitmap* bm = RankBitmaps[rank - 1];
+				int x = lb->box_x + lb->box_w - FSPACX(25); // align to right of listbox
+				int y = lb->box_y + (i - lb->first_item) * LINE_SPACING;
+				int h = LINE_SPACING * 0.7;
+				if (rank == 1)
+					h *= 1.0806; // Make the E-rank bigger to account for the tilt.
+				int w = h * 3;
+				ogl_ubitmapm_cs(x, y, w, h, bm, -1, F1_0);
+			}
+		}
 	default:
 		break;
 	}
@@ -816,7 +861,7 @@ int select_mission(int anarchy_mode, char* message, int (*when_selected)(void))
 			free_mission_list(mission_list);
 			return 0;
 		}
-
+		
 		mm->mission_list = mission_list;
 		mm->when_selected = when_selected;
 		default_mission = 0;
@@ -826,6 +871,27 @@ int select_mission(int anarchy_mode, char* message, int (*when_selected)(void))
 				default_mission = i;
 		}
 		newmenu_listbox1(message, num_missions, m, 1, default_mission, (int (*)(listbox*, d_event*, void*))mission_menu_handler, mm);
+	}
+	int mission_count = num_missions; // Store the number of missions in a local variable before load_mission_by_name overwrites it.
+	for (int i = 0; i < mission_count; i++) {
+		load_mission_by_name(Ranking.missionNames[i]); // Load the current mission so we can access how many levels it has.
+		int rankPoints = 0;
+		int currentRank;
+		for (int c = 1; c <= Current_mission->last_level - Current_mission->last_secret_level; c++) {
+			currentRank = CalculateRank(c);
+			if (currentRank > 0)
+				rankPoints += currentRank;
+			else {
+				rankPoints = 0; // We found an N/A somewhere, don't return an aggregate rank.
+				continue;
+			}
+		}
+		// If all levels in the current mission are completed, an aggregate rank set here will show next to it.
+		if (PlayerCfg.RankShowPlusMinus)
+			Ranking.missionRanks[i] = rankPoints / (Current_mission->last_level - Current_mission->last_secret_level);
+		else
+			Ranking.missionRanks[i] = truncateRanks(rankPoints / (Current_mission->last_level - Current_mission->last_secret_level));
+		free_mission(); // Free the current mission so we don't disrupt future processes that involve loading them.
 	}
 
 	return 1;	// presume success

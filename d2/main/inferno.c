@@ -459,7 +459,6 @@ int main(int argc, char *argv[])
 	{
 		Game_mode = GM_GAME_OVER;
 		DoMenu();
-		loadRankImages();
 	}
 
 	setjmp(LeaveEvents);

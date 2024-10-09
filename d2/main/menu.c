@@ -216,6 +216,32 @@ try_again:
 
 void delete_player_saved_games(char * name);
 
+int ranks_menu_keycommand(listbox* lb, d_event* event)
+{
+	char** items = listbox_get_items(lb);
+	int citem = listbox_get_citem(lb);
+	int delete;
+	char filename[256];
+
+	switch (event_key_get(event))
+	{
+	case KEY_CTRLED + KEY_D:
+		delete = nm_messagebox(NULL, 2, TXT_YES, TXT_NO, "Delete record for this level?");
+		if (delete == 0)
+		{
+			sprintf(filename, "ranks/%s/%s/level%d.hi", Players[Player_num].callsign, Current_mission->filename, citem + 1);
+			if (citem >= Current_mission->last_level)
+				sprintf(filename, "ranks/%s/%s/levelS%d.hi", Players[Player_num].callsign, Current_mission->filename, citem + 1);
+			if (PHYSFS_exists(filename)) {
+				PHYSFS_delete(filename);
+				nm_messagebox(NULL, 1, "Ok", "Record deleted.\nRefresh level list to update.");
+			}
+		}
+	}
+
+	return 0;
+}
+
 int player_menu_keycommand( listbox *lb, d_event *event )
 {
 	char **items = listbox_get_items(lb);
@@ -584,6 +610,9 @@ int ranks_menu_handler(listbox* lb, d_event* event, void* userdata)
 
 	switch (event->type)
 	{
+	case EVENT_KEY_COMMAND:
+		return ranks_menu_keycommand(lb, event);
+		break;
 	case EVENT_NEWMENU_SELECTED:
 		Players[Player_num].lives = 3;
 		Difficulty_level = PlayerCfg.DefaultDifficulty;
@@ -625,7 +654,7 @@ void do_best_ranks_menu()
 	int numlines = Current_mission->last_level - Current_mission->last_secret_level;
 	char** list = (char**)malloc(sizeof(char*) * numlines);
 	char message[256];
-	sprintf(message, "%s's %s records", Players[Player_num].callsign, Current_mission->mission_name);
+	sprintf(message, "%s's %s records\n<Ctrl-D> deletes", Players[Player_num].callsign, Current_mission->mission_name);
 	char filename[256];
 	char** items = (char**)malloc(sizeof(char*) * numlines);
 	int* ranks = (int*)malloc(sizeof(int) * numlines);
@@ -660,9 +689,9 @@ void do_best_ranks_menu()
 			list[i] = (char*)malloc(sizeof(char) * 64);
 			if (fp == NULL) {
 				if (i < Current_mission->last_level)
-					snprintf(list[i], 64, "%i. ???:\tN/A   ", i + 1);
+					snprintf(list[i], 64, "%i. ???\tN/A    ", i + 1);
 				else
-					snprintf(list[i], 64, "S%i. ???:\tN/A   ", i - Current_mission->last_level + 1);
+					snprintf(list[i], 64, "S%i. ???\tN/A    ", i - Current_mission->last_level + 1);
 				ranks[i] = 0;
 			}
 			else {
@@ -674,15 +703,15 @@ void do_best_ranks_menu()
 				snprintf(level_name, LEVEL_NAME_LEN, buffer);
 				if (Ranking.rank > 0) {
 					if (i < Current_mission->last_level)
-						snprintf(list[i], 64, "%i. %s:\t%.0f   ", i + 1, level_name, Ranking.calculatedScore);
+						snprintf(list[i], 64, "%i. %s\t%.0f    ", i + 1, level_name, Ranking.calculatedScore);
 					else
-						snprintf(list[i], 64, "S%i. %s:\t%.0f   ", i - Current_mission->last_level + 1, level_name, Ranking.calculatedScore);
+						snprintf(list[i], 64, "S%i. %s\t%.0f    ", i - Current_mission->last_level + 1, level_name, Ranking.calculatedScore);
 				}
 				else {
 					if (i < Current_mission->last_level)
-						snprintf(list[i], 64, "%i. %s:\tN/A   ", i + 1, level_name);
+						snprintf(list[i], 64, "%i. %s\tN/A    ", i + 1, level_name);
 					else
-						snprintf(list[i], 64, "S%i. %s:\tN/A   ", i - Current_mission->last_level + 1, level_name);
+						snprintf(list[i], 64, "S%i. %s\tN/A    ", i - Current_mission->last_level + 1, level_name);
 				}
 			}
 			PHYSFS_close(fp);
@@ -2188,11 +2217,12 @@ struct misc_menu_data {
 
 void do_misc_menu()
 {
-	newmenu_item m[35];
+	newmenu_item m[36];
 	int i = 0;
 	struct misc_menu_data misc_menu_data;
 
 	do {
+		ADD_CHECK(35, "Show +/- on rank letters", PlayerCfg.RankShowPlusMinus);
 		ADD_CHECK(0, "Ship auto-leveling", PlayerCfg.AutoLeveling);
 		ADD_CHECK(1, "Missile view", PlayerCfg.MissileViewEnabled);
 		ADD_CHECK(2, "Headlight on when picked up", PlayerCfg.HeadlightActiveDefault );
@@ -2326,6 +2356,7 @@ void do_misc_menu()
 		PlayerCfg.NoChatSound = m[24].value;
 		PlayerCfg.ShowCustomColors = m[29].value;
 		PlayerCfg.PreferMyTeamColors = (PlayerCfg.MyTeamColor == 8 && PlayerCfg.OtherTeamColor == 8) ? 0 : m[34].value;
+		PlayerCfg.RankShowPlusMinus = m[35].value;
 
 	} while( i>-1 );
 

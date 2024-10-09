@@ -704,6 +704,20 @@ void InitPlayerObject()
 	ConsoleObject->movement_type	= MT_PHYSICS;
 }
 
+int truncateRanks(int rank)
+{
+	int newRank = rank;
+	if (rank == 2 || rank == 4)
+		newRank = 3;
+	if (rank == 5 || rank == 7)
+		newRank = 6;
+	if (rank == 8 || rank == 10)
+		newRank = 9;
+	if (rank == 11 || rank == 13)
+		newRank = 12;
+	return newRank;
+}
+
 int CalculateRank(int level_num)
 {
 	int levelHostages = 0;
@@ -779,6 +793,8 @@ int CalculateRank(int level_num)
 		Ranking.rank = 1;
 	if (rankPoints2 >= 0)
 		Ranking.rank = (int)rankPoints2 + 2;
+	if (!PlayerCfg.RankShowPlusMinus)
+		Ranking.rank = truncateRanks(Ranking.rank);
 	return Ranking.rank;
 }
 
@@ -898,6 +914,32 @@ void StartNewGame(int start_level)
 	game_disable_cheats();
 }
 
+int endlevel_current_rank;
+extern grs_bitmap nm_background1;
+grs_bitmap transparent;
+int endlevel_handler(newmenu* menu, d_event* event, void* userdata) {
+	switch (event->type) {
+	case EVENT_WINDOW_DRAW:
+		gr_palette_load(gr_palette);
+		show_fullscr(&nm_background1);
+		grs_bitmap* bm = RankBitmaps[endlevel_current_rank];
+		int x = grd_curscreen->sc_w * 0.4;
+		int y = LINE_SPACING * 29;
+		int h = grd_curscreen->sc_h * 0.1125;
+		if (!endlevel_current_rank)
+			h *= 1.0806; // Make E-rank bigger to compensate for the tilt.
+		int w = 3 * h;
+			ogl_ubitmapm_cs(x, y, w, h, bm, -1, F1_0);
+		grs_bitmap oldbackground = nm_background1;
+		nm_background1 = transparent;
+		int ret = newmenu_draw(newmenu_get_window(menu), menu);
+		nm_background1 = oldbackground;
+		return ret;
+	}
+	return 0;
+}
+
+
 void DoEndLevelScoreGlitz(int network)
 {
 	if (Ranking.level_time == 0)
@@ -995,14 +1037,14 @@ void DoEndLevelScoreGlitz(int network)
 		else
 			sprintf(parTime, "%i:%.0f", parMinutes, parSeconds);
 		sprintf(m_str[c++], "Level score:\t%.0f", level_points - Ranking.excludePoints);
-		sprintf(m_str[c++], "Time: %s/%s     \t%i", time, parTime, time_points); // Add some spaces to ensure there's at least SOME distance between the stats and their points. This is the stuff that is most likely to overlap.
+		sprintf(m_str[c++], "Time: %s/%s\t%i", time, parTime, time_points); // Add some spaces to ensure there's at least SOME distance between the stats and their points. This is the stuff that is most likely to overlap.
 		sprintf(m_str[c++], "Hostages: %i/%i\t%.0f", Players[Player_num].hostages_on_board, Players[Player_num].hostages_level, hostage_points2);
 		sprintf(m_str[c++], "Skill: %s\t%.0f", diffname, skill_points2);
 		sprintf(m_str[c++], "Deaths: %.0f\t%i", Ranking.deathCount, death_points);
 		if (Ranking.missedRngDrops < 0)
 			sprintf(m_str[c++], "Missed RNG drops: \t%.0f\n", Ranking.missedRngDrops);
 		else
-			strcpy(m_str[c++], "");
+			strcpy(m_str[c++], "\n");
 		sprintf(m_str[c++], "%s%0.0f", TXT_TOTAL_SCORE, Ranking.rankScore);
 
 		double rankPoints = (Ranking.rankScore / Ranking.maxScore) * 12;
@@ -1011,16 +1053,12 @@ void DoEndLevelScoreGlitz(int network)
 		int rank = 0;
 		if (rankPoints >= 0)
 			rank = (int)rankPoints + 1;
-		grs_bitmap* bm = RankBitmaps[rank];
-		int x = grd_curscreen->sc_w * 0.4;
-		int y = LINE_SPACING * 10;
-		if (rank)
-			ogl_ubitmapm_cs(x, y, 486, 162, bm, -1, F1_0);
-		else
-			ogl_ubitmapm_cs(x, y, 525, 175, bm, -1, F1_0); // Make the E-rank bigger to compensate for the tilt.
+		if (!PlayerCfg.RankShowPlusMinus)
+			rank = truncateRanks(rank + 1) - 1;
+		endlevel_current_rank = rank;
 		if (cheats.enabled) {
-			strcpy(m_str[c++], "\n\n");
-			sprintf(m_str[c++], "Cheated, no save!"); // Don't show vanilla score when cheating, as players already know it'll always be zero.
+			strcpy(m_str[c++], "\n\n\n");
+			sprintf(m_str[c++], "   Cheated, no save!   "); // Don't show vanilla score when cheating, as players already know it'll always be zero.
 		}
 		else {
 			PHYSFS_File* fp;
@@ -1055,20 +1093,20 @@ void DoEndLevelScoreGlitz(int network)
 					PHYSFS_close(fp);
 					PHYSFS_delete(filename);
 					PHYSFSX_rename(temp_filename, filename);
+					if (Ranking.rank > 0)
+						sprintf(m_str[c++], "New record!");
 				}
 				PHYSFS_close(fp);
-				if (Ranking.rank > 0) {
-					sprintf(m_str[c++], "New record!");
-					strcpy(m_str[c++], "\n");
-				}
-				else
+				if (Ranking.rankScore > Ranking.calculatedScore && Ranking.rank > 0)
 					strcpy(m_str[c++], "\n\n");
+				else
+					strcpy(m_str[c++], "\n\n\n");
 			}
 			else {
 				sprintf(m_str[c++], "Saving error. Replay level.");
 				PHYSFS_close(fp);
 			}
-			sprintf(m_str[c++], "Vanilla score:\t %i", Players[Player_num].score); // Show players' base game score at the end of each level, so they can still compete with it when using the mod.
+			sprintf(m_str[c++], "Vanilla score:\t      %i", Players[Player_num].score); // Show players' base game score at the end of each level, so they can still compete with it when using the mod.
 		}
 	}
 	else {
@@ -1100,18 +1138,24 @@ void DoEndLevelScoreGlitz(int network)
 		// m[c].type = NM_TYPE_MENU;	m[c++].text = "Ok";
 
 		if (Current_level_num < 0)
-			sprintf(title, "%s%s %d %s\n %s %s", is_last_level ? "\n\n\n" : "\n", TXT_SECRET_LEVEL, -Current_level_num, TXT_COMPLETE, Current_level_name, TXT_DESTROYED);
+			sprintf(title, "%s%s %d %s\n %s %s", is_last_level ? "\n" : "\n", TXT_SECRET_LEVEL, -Current_level_num, TXT_COMPLETE, Current_level_name, TXT_DESTROYED);
 		else
-			sprintf(title, "%s%s %d %s\n%s %s", is_last_level ? "\n\n\n" : "\n", TXT_LEVEL, Current_level_num, TXT_COMPLETE, Current_level_name, TXT_DESTROYED);
+			sprintf(title, "%s%s %d %s\n%s %s", is_last_level ? "\n" : "\n", TXT_LEVEL, Current_level_num, TXT_COMPLETE, Current_level_name, TXT_DESTROYED);
 
 		Assert(c <= N_GLITZITEMS);
+
+		gr_init_bitmap_alloc(&transparent, BM_LINEAR, 0, 0, 1, 1, 1);
+		transparent.bm_data[0] = 255;
+		transparent.bm_flags |= BM_FLAG_TRANSPARENT;
 
 #ifdef NETWORK
 		if (network && (Game_mode & GM_NETWORK))
 			newmenu_do2(NULL, title, c, m, multi_endlevel_poll1, NULL, 0, Menu_pcx_name);
 		else
 #endif	// Note link!
-			newmenu_do2(NULL, title, c, m, NULL, NULL, 0, Menu_pcx_name);
+			newmenu_do2(NULL, title, c, m, endlevel_handler, NULL, 0, Menu_pcx_name);
+
+		gr_free_bitmap_data(&transparent);
 }
 
 int draw_rock(newmenu *menu, d_event *event, grs_bitmap *background)

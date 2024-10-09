@@ -110,6 +110,7 @@ extern void DoEndLevelScoreGlitz(int network);
 
 // Calculate scores and ranks based on saved performance data
 extern int CalculateRank(int level_num);
+extern int truncateRanks(int rank);
 
 extern void getLevelNameFromRankFile(int level_num, char* buffer);
  

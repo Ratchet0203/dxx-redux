@@ -137,6 +137,9 @@ typedef struct ranking { // This struct contains variables for the ranking syste
 	int        alreadyBeaten;                      // Tracks whether the current level has been beaten before, so points remaining and par time HUD elements are not shown on a new level.
 	int        deleted;                            // Whether to tell the player their record file was deleted due to a level change.
 	int        listbox_first_item;                 // Globally tracks what the first item of the best ranks menu listbox is.
+	int		   fromBestRanksButton;                // Tracks whether the mission list was accessed from the best ranks button for not, to know whether to show aggregates and allow record deleting.
+	int        missionRanks[5000];                 // A struct for the aggregate ranks on the missions list because the userdata field for the list is already used by something.
+	const char missionNames[5000][12];             // A struct for the mission names, since we have to load missions in order after the list is created.
 } __pack__ ranking;
 
 // Same as above but structure how Savegames expect

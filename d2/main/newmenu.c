@@ -2059,7 +2059,7 @@ int listbox_draw(window *wind, listbox *lb)
 			}
 			else
 			{
-				gr_string( lb->box_x+FSPACX(5), y, lb->item[i]  );
+				nm_string(lb->box_w, lb->box_x + FSPACX(5), y, lb->item[i], 0);
 			}
 		}
 	}

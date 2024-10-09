@@ -2314,7 +2314,7 @@ void ogl_update_window_clip()
 void loadRankImages()
 {
 	for (int i = 0; i < 14; i++) {
-		RankBitmaps[i] = gr_create_bitmap(1080, 360);
+		RankBitmaps[i] = gr_create_bitmap(144, 48);
 		ogl_loadranktexture(RankBitmaps[i], GameCfg.TexFilt, 0, i);
 	}
 }
